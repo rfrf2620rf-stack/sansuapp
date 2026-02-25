@@ -15,6 +15,8 @@ import { resumeAudio } from './utils/audio.js';
 
 // ===== Initialization =====
 const canvas = document.getElementById('game-canvas');
+const backBtn = document.getElementById('back-btn');
+const roundInfo = document.getElementById('round-info');
 const { width, height } = getCanvasSize();
 
 // Init subsystems
@@ -26,10 +28,35 @@ initCollision(engine);
 // ===== Merge callback =====
 onMerge((numA, numB, mx, my) => {
   const level = getCurrentLevel();
-  if (level === 1) onLevel1Merge(numA, numB);
+  if (level === 1) {
+    onLevel1Merge(numA, numB);
+    updateRoundDisplay();
+  }
   else if (level === 2) onLevel2Merge(numA, numB);
   else if (level === 3) onLevel3Merge(numA, numB);
 });
+
+// ===== Back button =====
+function setupBackButton() {
+  const handler = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    goBackToMenu();
+  };
+  backBtn.addEventListener('click', handler);
+  backBtn.addEventListener('touchstart', handler, { passive: false });
+}
+setupBackButton();
+
+function goBackToMenu() {
+  const level = getCurrentLevel();
+  if (level === 1) cleanupLevel1();
+  else if (level === 2) cleanupLevel2();
+  else if (level === 3) cleanupLevel3();
+  backBtn.classList.remove('visible');
+  if (roundInfo) roundInfo.classList.remove('visible');
+  showMenu();
+}
 
 // ===== Menu buttons =====
 document.querySelectorAll('.level-btn').forEach(btn => {
@@ -44,10 +71,22 @@ document.querySelectorAll('.level-btn').forEach(btn => {
   btn.addEventListener('touchstart', handler, { passive: false });
 });
 
+/** Update round display for Lv.1 */
+function updateRoundDisplay() {
+  if (!roundInfo) return;
+  const level = getCurrentLevel();
+  if (level === 1) {
+    const info = getLevel1RoundInfo();
+    roundInfo.textContent = `Round ${info.current} / ${info.total}`;
+    roundInfo.classList.add('visible');
+  }
+}
+
 /** Start a specific level */
 function startGame(level) {
   hideMenu();
   setCurrentLevel(level);
+  backBtn.classList.add('visible');
   const { width, height } = getCanvasSize();
 
   if (level === 1) {
@@ -55,14 +94,18 @@ function startGame(level) {
       showMessage('🎉 Clear!', 2000);
       setTimeout(() => {
         cleanupLevel1();
+        backBtn.classList.remove('visible');
+        if (roundInfo) roundInfo.classList.remove('visible');
         showMenu();
       }, 2500);
     });
+    updateRoundDisplay();
   } else if (level === 2) {
     startLevel2(width, height, () => {
       showMessage('Game Over', 2000);
       setTimeout(() => {
         cleanupLevel2();
+        backBtn.classList.remove('visible');
         showMenu();
       }, 2500);
     });
@@ -71,6 +114,7 @@ function startGame(level) {
       showMessage('🎉 Clear!', 2000);
       setTimeout(() => {
         cleanupLevel3();
+        backBtn.classList.remove('visible');
         showMenu();
       }, 2500);
     });
@@ -105,7 +149,6 @@ function gameLoop(time) {
 
   // ===== Render =====
   const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
 
   // Clear and draw background
   drawBackground();

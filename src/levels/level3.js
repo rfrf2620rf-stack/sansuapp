@@ -1,11 +1,11 @@
 /**
  * level3.js - Lv.3 忍者モード
- * 数字が数秒後に「？」に変化、記憶力で合わせる
+ * 数字が数秒後に「？」に変化、5秒おきにチラッと再表示される
  */
 import { createSlimePairs, generateRandomPairs } from '../game/slime.js';
 import { clearBodies, getWorld, Body } from '../engine/physics.js';
 import { LEVEL3, PHYSICS } from '../utils/constants.js';
-import { playClearSound } from '../utils/audio.js';
+import { playClearSound, playTapSound } from '../utils/audio.js';
 import { resetScore, addMergeScore, showScore, saveHighScore } from '../game/score.js';
 
 let slimes = [];
@@ -13,6 +13,8 @@ let onCompleteCallback = null;
 let roundCount = 0;
 let maxRounds = 5;
 let floatTimer = 0;
+let revealInterval = null;
+let hideTimeout = null;
 
 /** Start Level 3 */
 export function startLevel3(width, height, onComplete) {
@@ -27,19 +29,73 @@ export function startLevel3(width, height, onComplete) {
 function spawnNinjaRound(width, height) {
   clearBodies();
   slimes = [];
+  clearTimers();
 
   const pairCount = Math.min(2 + roundCount, 5);
   const pairs = generateRandomPairs(pairCount);
   slimes = createSlimePairs(pairs, width, height);
 
-  // After reveal duration, hide the numbers
-  setTimeout(() => {
-    for (const body of slimes) {
-      if (getWorld().bodies.includes(body)) {
-        body.hiddenNumber = true;
-      }
-    }
+  // Initially show the numbers for 3 seconds
+  for (const body of slimes) {
+    body.hiddenNumber = false;
+  }
+
+  // After initial reveal, hide them
+  hideTimeout = setTimeout(() => {
+    hideAllNumbers();
+    // Start periodic reveal cycle: every 5 seconds, briefly show numbers for 1.5 seconds
+    startPeriodicReveal();
   }, LEVEL3.revealDuration);
+}
+
+/** Hide all numbers */
+function hideAllNumbers() {
+  for (const body of slimes) {
+    if (getWorld().bodies.includes(body)) {
+      body.hiddenNumber = true;
+    }
+  }
+}
+
+/** Show all numbers temporarily */
+function revealAllNumbers() {
+  for (const body of slimes) {
+    if (getWorld().bodies.includes(body)) {
+      body.hiddenNumber = false;
+    }
+  }
+  playTapSound(); // Subtle sound cue when numbers appear
+}
+
+/** Start the periodic reveal cycle */
+function startPeriodicReveal() {
+  clearInterval(revealInterval);
+  revealInterval = setInterval(() => {
+    // Only reveal if there are still active slimes
+    const active = slimes.filter(s => getWorld().bodies.includes(s));
+    if (active.length <= 0) {
+      clearTimers();
+      return;
+    }
+
+    // Flash: show numbers for 1.5 seconds
+    revealAllNumbers();
+    hideTimeout = setTimeout(() => {
+      hideAllNumbers();
+    }, 1500);
+  }, 5000); // Every 5 seconds
+}
+
+/** Clear all timers */
+function clearTimers() {
+  if (revealInterval) {
+    clearInterval(revealInterval);
+    revealInterval = null;
+  }
+  if (hideTimeout) {
+    clearTimeout(hideTimeout);
+    hideTimeout = null;
+  }
 }
 
 /** Called when two slimes merge in Level 3 */
@@ -49,6 +105,7 @@ export function onLevel3Merge(numA, numB) {
 
   const remaining = slimes.filter(s => s.slimeNumber);
   if (remaining.length <= 0) {
+    clearTimers();
     roundCount++;
     if (roundCount >= maxRounds) {
       playClearSound();
@@ -104,6 +161,7 @@ export function getLevel3Slimes() {
 
 /** Cleanup Level 3 */
 export function cleanupLevel3() {
+  clearTimers();
   clearBodies();
   slimes = [];
   showScore(false);

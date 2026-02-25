@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <title>Make 10!</title>
+    <link rel="stylesheet" href="/src/styles/index.css" />
+  </head>
+  <body>
+    <canvas id="game-canvas"></canvas>
+    <div id="ui-overlay">
+      <div id="score-display">0</div>
+      <div id="level-info"></div>
+      <div id="message-display"></div>
+    </div>
+    <div id="menu-screen">
+      <div class="menu-title">
+        <span class="title-make">Make</span>
+        <span class="title-10">10!</span>
+      </div>
+      <div class="menu-buttons">
+        <button class="level-btn" data-level="1">
+          <span class="level-icon">🟢</span>
+          <span class="level-num">Lv.1</span>
+        </button>
+        <button class="level-btn" data-level="2">
+          <span class="level-icon">🔵</span>
+          <span class="level-num">Lv.2</span>
+        </button>
+        <button class="level-btn locked" data-level="3">
+          <span class="level-icon">🟣</span>
+          <span class="level-num">Lv.3</span>
+        </button>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

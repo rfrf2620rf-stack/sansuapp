@@ -47,6 +47,7 @@ export function createSlime(num, x, y) {
 
 /**
  * Create multiple slime pairs for Lv.1
+ * Ensures minimum distance between all slimes to prevent auto-merge
  * @param {number[][]} pairs - Array of [a, b] pairs that sum to 10
  * @param {number} width - Canvas width
  * @param {number} height - Canvas height
@@ -54,19 +55,54 @@ export function createSlime(num, x, y) {
  */
 export function createSlimePairs(pairs, width, height) {
   const bodies = [];
-  const margin = 80;
+  const margin = 100;
   const usableW = width - margin * 2;
   const usableH = height - margin * 2;
+  const MIN_DISTANCE = 200; // Minimum distance between any two slimes
+  const positions = [];
 
-  pairs.forEach((pair, i) => {
-    pair.forEach((num, j) => {
-      // Spread out randomly within usable area
-      const x = margin + Math.random() * usableW;
-      const y = margin + Math.random() * usableH * 0.7;
-      const body = createSlime(num, x, y);
-      if (body) bodies.push(body);
-    });
+  // Flatten all numbers from pairs
+  const allNums = [];
+  pairs.forEach(pair => {
+    pair.forEach(num => allNums.push(num));
   });
+
+  // Generate well-spaced positions
+  for (let i = 0; i < allNums.length; i++) {
+    let x, y;
+    let attempts = 0;
+    const maxAttempts = 100;
+
+    do {
+      x = margin + Math.random() * usableW;
+      y = margin + Math.random() * usableH * 0.6;
+      attempts++;
+    } while (
+      attempts < maxAttempts &&
+      positions.some(pos => {
+        const dx = pos.x - x;
+        const dy = pos.y - y;
+        return Math.sqrt(dx * dx + dy * dy) < MIN_DISTANCE;
+      })
+    );
+
+    // If couldn't find good random position, use grid layout
+    if (attempts >= maxAttempts) {
+      const cols = Math.ceil(Math.sqrt(allNums.length));
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      x = margin + (col + 0.5) * (usableW / cols);
+      y = margin + (row + 0.5) * (usableH * 0.6 / Math.ceil(allNums.length / cols));
+    }
+
+    positions.push({ x, y });
+    const body = createSlime(allNums[i], x, y);
+    if (body) {
+      // Spawn immunity: ignore collisions for 1.5 seconds
+      body.spawnImmunity = performance.now() + 1500;
+      bodies.push(body);
+    }
+  }
 
   return bodies;
 }

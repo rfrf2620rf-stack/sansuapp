@@ -29,6 +29,13 @@ function handleCollision(bodyA, bodyB) {
   // Only handle slime-slime collisions
   if (!bodyA.slimeNumber || !bodyB.slimeNumber) return;
 
+  // Spawn immunity: skip collisions during immunity period
+  const now = performance.now();
+  if ((bodyA.spawnImmunity && now < bodyA.spawnImmunity) ||
+      (bodyB.spawnImmunity && now < bodyB.spawnImmunity)) {
+    return;
+  }
+
   // Debounce: prevent rapid re-triggering
   const key = [bodyA.id, bodyB.id].sort().join('-');
   if (recentCollisions.has(key)) return;

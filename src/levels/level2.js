@@ -10,17 +10,18 @@ import { resetScore, addMergeScore, showScore, saveHighScore } from '../game/sco
 
 let fallingSlime = null;
 let bulletSlime = null;
-let spawnTimer = null;
 let lives = 3;
-let score = 0;
 let isActive = false;
 let onCompleteCallback = null;
 let buttonContainer = null;
+let mergeCount = 0;
+const MAX_MERGES = 15; // Clear after 15 successful merges
 
 /** Start Level 2 */
 export function startLevel2(width, height, onComplete) {
   onCompleteCallback = onComplete;
   lives = 3;
+  mergeCount = 0;
   isActive = true;
   resetScore();
   showScore(true);
@@ -28,8 +29,8 @@ export function startLevel2(width, height, onComplete) {
   // Create/show shooter buttons
   setupButtons(width, height);
 
-  // Start spawning
-  spawnFallingSlime(width);
+  // Start spawning after short delay
+  setTimeout(() => spawnFallingSlime(width), 500);
 }
 
 /** Setup bottom buttons */
@@ -51,8 +52,17 @@ function spawnFallingSlime(width) {
   const num = Math.floor(Math.random() * 9) + 1;
   const x = 100 + Math.random() * (width - 200);
 
-  fallingSlime = createSlime(num, x, -50);
-  Body.setVelocity(fallingSlime, { x: 0, y: LEVEL2.fallSpeed });
+  // Spawn just inside the screen (top wall is at y ~ -30)
+  fallingSlime = createSlime(num, x, 10);
+
+  // IMPORTANT: Clear spawn immunity so falling slime can merge with bullet
+  fallingSlime.spawnImmunity = 0;
+
+  // Disable air friction for smooth falling
+  fallingSlime.frictionAir = 0;
+
+  // Give it a constant downward velocity
+  Body.setVelocity(fallingSlime, { x: 0, y: 2 });
 
   // Generate button options (always include the correct answer)
   generateButtons(num, width);
@@ -83,11 +93,13 @@ function generateButtons(fallingNum, width) {
     btn.className = 'shoot-btn';
     btn.textContent = num;
     btn.style.borderColor = SLIME_CONFIG[num]?.color || '#fff';
-    btn.addEventListener('click', () => shootBullet(num, width));
-    btn.addEventListener('touchstart', (e) => {
+    const handler = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       shootBullet(num, width);
-    }, { passive: false });
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('touchstart', handler, { passive: false });
     buttonContainer.appendChild(btn);
   });
 }
@@ -98,41 +110,77 @@ function shootBullet(num, width) {
 
   playTapSound();
 
-  // Create bullet at bottom center
+  // Create bullet at bottom center, aimed at falling slime
+  const targetX = fallingSlime.position.x;
   const x = window.innerWidth / 2;
-  const y = window.innerHeight - 100;
+  const y = window.innerHeight - 120;
+
   bulletSlime = createSlime(num, x, y);
-  Body.setVelocity(bulletSlime, { x: 0, y: -12 });
+  // Clear spawn immunity for bullet too
+  bulletSlime.spawnImmunity = 0;
+
+  // Calculate direction toward falling slime
+  const dx = targetX - x;
+  const dy = fallingSlime.position.y - y;
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+  const speed = 14;
+  Body.setVelocity(bulletSlime, {
+    x: (dx / dist) * speed,
+    y: (dy / dist) * speed
+  });
 }
 
 /** Update Level 2 per frame */
 export function updateLevel2(time) {
   if (!isActive) return;
 
-  // Check if falling slime hit the ground
-  if (fallingSlime && fallingSlime.position.y > window.innerHeight * LEVEL2.groundY) {
-    // Miss! Remove and lose a life
-    removeBody(fallingSlime);
-    fallingSlime = null;
-    lives--;
+  // Keep falling slime moving downward (override physics drift)
+  if (fallingSlime && getWorld().bodies.includes(fallingSlime)) {
+    // Maintain downward velocity (gravity is very low globally)
+    const vy = fallingSlime.velocity.y;
+    if (vy < 2) {
+      Body.setVelocity(fallingSlime, {
+        x: fallingSlime.velocity.x * 0.95,
+        y: Math.max(vy, 2)
+      });
+    }
 
-    if (lives <= 0) {
-      // Game over
-      isActive = false;
-      saveHighScore(2);
-      if (onCompleteCallback) {
-        setTimeout(() => onCompleteCallback(), 1500);
+    // Check if falling slime hit the ground
+    if (fallingSlime.position.y > window.innerHeight * LEVEL2.groundY) {
+      // Miss! Remove and lose a life
+      removeBody(fallingSlime);
+      fallingSlime = null;
+      lives--;
+
+      // Remove any stale bullet
+      if (bulletSlime) {
+        removeBody(bulletSlime);
+        bulletSlime = null;
       }
-    } else {
-      // Next slime
-      setTimeout(() => spawnFallingSlime(window.innerWidth), 1000);
+
+      if (lives <= 0) {
+        // Game over
+        isActive = false;
+        saveHighScore(2);
+        if (onCompleteCallback) {
+          setTimeout(() => onCompleteCallback(), 1500);
+        }
+      } else {
+        // Next slime
+        setTimeout(() => spawnFallingSlime(window.innerWidth), 800);
+      }
     }
   }
 
   // Remove bullet if it goes off screen
-  if (bulletSlime && bulletSlime.position.y < -50) {
-    removeBody(bulletSlime);
-    bulletSlime = null;
+  if (bulletSlime) {
+    if (bulletSlime.position.y < -100 ||
+        bulletSlime.position.y > window.innerHeight + 100 ||
+        bulletSlime.position.x < -100 ||
+        bulletSlime.position.x > window.innerWidth + 100) {
+      removeBody(bulletSlime);
+      bulletSlime = null;
+    }
   }
 }
 
@@ -141,11 +189,22 @@ export function onLevel2Merge(numA, numB) {
   addMergeScore();
   fallingSlime = null;
   bulletSlime = null;
+  mergeCount++;
 
-  // Spawn next after delay
-  setTimeout(() => {
-    spawnFallingSlime(window.innerWidth);
-  }, LEVEL2.spawnInterval / 3);
+  if (mergeCount >= MAX_MERGES) {
+    // Level clear!
+    isActive = false;
+    playClearSound();
+    saveHighScore(2);
+    if (onCompleteCallback) {
+      setTimeout(() => onCompleteCallback(), 1500);
+    }
+  } else {
+    // Spawn next after brief delay
+    setTimeout(() => {
+      spawnFallingSlime(window.innerWidth);
+    }, 1000);
+  }
 }
 
 /** Cleanup Level 2 */
@@ -163,5 +222,5 @@ export function cleanupLevel2() {
 
 /** Get Level 2 state */
 export function getLevel2State() {
-  return { lives, isActive };
+  return { lives, isActive, mergeCount };
 }

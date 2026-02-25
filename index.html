@@ -16,11 +16,14 @@
   </head>
   <body>
     <canvas id="game-canvas"></canvas>
+    <button id="back-btn">←</button>
     <div id="ui-overlay">
       <div id="score-display">0</div>
       <div id="level-info"></div>
+      <div id="round-info"></div>
       <div id="message-display"></div>
     </div>
+    <div id="shooter-buttons"></div>
     <div id="menu-screen">
       <div class="menu-title">
         <span class="title-make">Make</span>
@@ -35,7 +38,7 @@
           <span class="level-icon">🔵</span>
           <span class="level-num">Lv.2</span>
         </button>
-        <button class="level-btn locked" data-level="3">
+        <button class="level-btn" data-level="3">
           <span class="level-icon">🟣</span>
           <span class="level-num">Lv.3</span>
         </button>

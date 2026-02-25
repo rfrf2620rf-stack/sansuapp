@@ -72,23 +72,34 @@ export function onLevel1Merge(numA, numB) {
 /** Update floating behavior per frame */
 export function updateLevel1(time) {
   floatTimer += 1;
+  const centerX = window.innerWidth / 2;
+  const centerY = window.innerHeight * 0.4; // Target center area (slightly above middle)
 
-  // Apply gentle random forces to make slimes float
+  // Apply gentle forces to make slimes float around center
   for (const body of slimes) {
     if (!body.slimeNumber || body.isStatic) continue;
     if (!getWorld().bodies.includes(body)) continue;
 
-    // Gentle upward drift
-    const fx = Math.sin(floatTimer * 0.02 + body.id * 2.3) * PHYSICS.floatForce;
-    const fy = -Math.abs(Math.cos(floatTimer * 0.015 + body.id * 1.7)) * PHYSICS.floatForce * 1.5;
-    Body.applyForce(body, body.position, { x: fx, y: fy });
+    // Organic drifting motion
+    const fx = Math.sin(floatTimer * 0.015 + body.id * 2.3) * PHYSICS.floatForce;
+    const fy = Math.cos(floatTimer * 0.012 + body.id * 1.7) * PHYSICS.floatForce;
+
+    // Pull toward center area (stronger the further from center)
+    const dx = centerX - body.position.x;
+    const dy = centerY - body.position.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const pullStrength = 0.000015 * Math.max(0, dist - 100); // Only pull if far from center
+    const pullX = (dx / (dist || 1)) * pullStrength;
+    const pullY = (dy / (dist || 1)) * pullStrength;
+
+    Body.applyForce(body, body.position, { x: fx + pullX, y: fy + pullY });
 
     // Dampen if too fast
     const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
-    if (speed > 5) {
+    if (speed > 4) {
       Body.setVelocity(body, {
-        x: body.velocity.x * 0.95,
-        y: body.velocity.y * 0.95,
+        x: body.velocity.x * 0.92,
+        y: body.velocity.y * 0.92,
       });
     }
   }
